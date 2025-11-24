@@ -2,6 +2,9 @@
 
 A lightweight web-based tool for Image Quality Assessment(IQA). Built with Streamlit and PyIQA, it provides a comprehensive suite of metrics and visualization tools for researchers to evaluate and compare model results efficiently.
 
+![App Screenshot](fig/app.png)
+
+
 ## ✨ Features
 
 ### 1. Comprehensive Metrics Support
@@ -30,7 +33,7 @@ Calculate a wide range of Full-Reference (FR) and No-Reference (NR) metrics:
 1.  **Clone the repository**:
 
     ```bash
-    git clone <your-repo-url>
+    git clone git@github.com:XuBao12/IQA-Visualization.git
     cd sr-iqa-visualizer
     ```
 
