@@ -1,31 +1,74 @@
-# SR-IQA Visualizer (图像超分质量评价工作台)
+# SR-IQA Visualization
 
-A lightweight web tool for Image Super-Resolution (SR) and Restoration quality assessment. It allows researchers to upload "Reference (GT)" and "Distorted (SR)" images to calculate metrics and visualize differences interactively.
+A lightweight web-based tool for Image Quality Assessment(IQA). Built with Streamlit and PyIQA, it provides a comprehensive suite of metrics and visualization tools for researchers to evaluate and compare model results efficiently.
 
-## Features
+## ✨ Features
 
-- **Metrics Calculation**: Automatically calculates PSNR (Y-channel/RGB), SSIM, and LPIPS (VGG/Alex).
-- **Visual Comparison**: Interactive "Before/After" slider.
-- **Error Analysis**: Heatmap visualization of pixel-wise differences.
-- **Frequency Domain**: FFT Spectrum analysis to check for high-frequency artifacts.
-- **ROI Zoom**: Inspect local details with digital zoom.
+### 1. Comprehensive Metrics Support
 
-## Installation
+Calculate a wide range of Full-Reference (FR) and No-Reference (NR) metrics:
 
-1.  Install dependencies:
+- **Standard**: PSNR, SSIM
+- **Perceptual**: LPIPS, DISTS, FID
+- **No-Reference**: CLIPIQA, CNNIQA, MUSIQ
+- _Customizable selection via sidebar._
 
+### 2. Flexible Input Modes
+
+- **Upload File**: Drag & drop local images.
+- **Server Path**: Direct input of absolute file paths on the server.
+- **Server Folder (Batch Mode)**: Point to GT and SR folders to browse and evaluate the entire dataset image by image with navigation buttons (Previous/Next).
+
+### 3. Advanced Visualization
+
+- **Slider Comparison**: Interactive "Before/After" slider to inspect restoration details.
+- **Error Heatmap**: Visualize pixel-wise absolute differences.
+- **FFT Spectrum**: Frequency domain analysis to detect artifacts or high-frequency loss.
+
+## 🛠️ Installation
+
+1.  **Clone the repository**:
+
+    ```bash
+    git clone <your-repo-url>
+    cd sr-iqa-visualizer
+    ```
+
+2.  **Install dependencies**:
     ```bash
     pip install -r requirements.txt
     ```
 
-2.  Run the app:
+## 🚀 Usage
+
+1.  **Start the application**:
+
     ```bash
-    streamlit run app.py
+    python -m streamlit run app.py
     ```
 
-## Usage
+2.  **Configure Settings (Sidebar)**:
 
-1.  Open the app in your browser (usually `http://localhost:8501`).
-2.  Use the **Sidebar** to configure settings (LPIPS backbone, Crop Border).
-3.  Upload your **Reference (GT)** and **Distorted (SR)** images.
-4.  View metrics and explore the visualizations in the main area.
+    - **Select Metrics**: Choose which metrics to calculate (e.g., PSNR, SSIM, LPIPS, MUSIQ...).
+    - **LPIPS Backbone**: VGG or Alex.
+    - **Crop Border**: Pixels to ignore around the edges (standard practice in SR).
+
+3.  **Select Input Mode**:
+    - **Upload File**: Good for quick checks of local files.
+    - **Server Path**: Good for checking specific files on the remote server.
+    - **Server Folder**: Best for browsing results. Ensure filenames in GT and SR folders match.
+
+## 📂 Project Structure
+
+```
+.
+├── app.py              # Main Streamlit application
+├── utils.py            # Helper functions (Metrics, I/O, Preprocessing)
+├── requirements.txt    # Python dependencies
+└── README.md           # Documentation
+```
+
+## 📝 Notes
+
+- **First Run**: When selecting metrics like MUSIQ or FID for the first time, `pyiqa` will automatically download the pretrained weights. This may take a few minutes.
+- **FID**: Calculated on single image pairs here, which is an approximation. Standard FID is calculated on distributions.
