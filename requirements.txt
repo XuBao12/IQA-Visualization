@@ -1,0 +1,9 @@
+streamlit
+streamlit-image-comparison
+torch
+torchvision
+numpy
+opencv-python
+matplotlib
+pyiqa
+scikit-image
