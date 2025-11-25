@@ -19,7 +19,7 @@ Calculate a wide range of Full-Reference (FR) and No-Reference (NR) metrics:
 
 - **Upload File**: Drag & drop local images.
 - **Server Path**: Direct input of absolute file paths on the server.
-- **Server Folder (Batch Mode)**: Point to GT and SR folders to browse and evaluate the entire dataset image by image with navigation buttons (Previous/Next).
+- **Server Folder (Batch Mode)**: Point to GT and SR folders to browse images. Supports **Batch Evaluation** to calculate average metrics (including FID) for the entire dataset with one click.
 
 ### 3. Advanced Visualization
 
@@ -74,4 +74,5 @@ Calculate a wide range of Full-Reference (FR) and No-Reference (NR) metrics:
 ## 📝 Notes
 
 - **First Run**: When selecting metrics like MUSIQ or FID for the first time, `pyiqa` will automatically download the pretrained weights. This may take a few minutes.
-- **FID**: Calculated on single image pairs here, which is an approximation. Standard FID is calculated on distributions.
+- **FID**: When using "Server Folder" mode, FID is calculated globally on the entire dataset distribution (standard practice). For single images, it is not computed.
+- **Metric Standards**: PSNR/SSIM are calculated on the Y-channel (YCbCr) with border cropping by default, following standard SR academic protocols.

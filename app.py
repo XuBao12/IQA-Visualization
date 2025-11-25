@@ -196,6 +196,10 @@ if img_gt_raw is not None and img_sr_raw is not None:
             status_text = st.empty()
             all_metrics = []
 
+            # Separate FID from per-image metrics
+            per_image_metrics_selection = [m for m in selected_metrics if m != "FID"]
+            calc_fid = "FID" in selected_metrics
+
             total_files = len(valid_files)
             for i, filename in enumerate(valid_files):
                 status_text.text(f"Processing {i+1}/{total_files}: {filename}")
@@ -212,19 +216,29 @@ if img_gt_raw is not None and img_sr_raw is not None:
                             i_gt_raw, i_sr_raw, crop_border=crop_border
                         )
 
-                        m = utils.calculate_metrics(
-                            i_gt_p,
-                            i_sr_p,
-                            use_y_channel=use_y_channel,
-                            lpips_net=lpips_net,
-                            selected_metrics=selected_metrics,
-                        )
-                        m["Filename"] = filename
-                        all_metrics.append(m)
+                        if per_image_metrics_selection:
+                            m = utils.calculate_metrics(
+                                i_gt_p,
+                                i_sr_p,
+                                use_y_channel=use_y_channel,
+                                lpips_net=lpips_net,
+                                selected_metrics=per_image_metrics_selection,
+                            )
+                            m["Filename"] = filename
+                            all_metrics.append(m)
+                        else:
+                            all_metrics.append({"Filename": filename})
                 except Exception as e:
                     st.warning(f"Failed to process {filename}: {e}")
 
                 progress_bar.progress((i + 1) / total_files)
+
+            # Calculate FID globally
+            fid_score = None
+            if calc_fid:
+                status_text.text("Calculating FID... (This may take a while)")
+                with st.spinner("Calculating FID..."):
+                    fid_score = utils.calculate_fid_folder(gt_folder, sr_folder)
 
             status_text.empty()
 
@@ -232,32 +246,46 @@ if img_gt_raw is not None and img_sr_raw is not None:
                 df_all = pd.DataFrame(all_metrics)
 
                 # Move Filename to first column
-                cols = ["Filename"] + [c for c in df_all.columns if c != "Filename"]
-                df_all = df_all[cols]
+                if "Filename" in df_all.columns:
+                    cols = ["Filename"] + [c for c in df_all.columns if c != "Filename"]
+                    df_all = df_all[cols]
+
                 st.session_state["batch_results"] = df_all
+                st.session_state["batch_fid"] = fid_score
                 st.success("Batch Evaluation Completed!")
             else:
                 st.error("No metrics calculated.")
 
         if "batch_results" in st.session_state:
             df_all = st.session_state["batch_results"]
+            fid_score = st.session_state.get("batch_fid", None)
 
             # Average
             numeric_cols = df_all.select_dtypes(include=[np.number]).columns
             avg_metrics = df_all[numeric_cols].mean()
 
-            st.write("### 平均指标 (Average Metrics)")
-            cols_avg = st.columns(len(avg_metrics))
-            for col, (name, value) in zip(cols_avg, avg_metrics.items()):
-                lower_is_better = name in ["LPIPS", "FID", "DISTS"]
-                delta_color = "inverse" if lower_is_better else "normal"
+            if fid_score is not None:
+                avg_metrics["FID"] = fid_score
 
-                display_val = f"{value:.4f}"
-                if name == "PSNR":
-                    display_val += " dB"
-                col.metric(name, display_val, delta_color=delta_color)
+            st.write("### 平均指标 (Average Metrics)")
+            if not avg_metrics.empty:
+                cols_avg = st.columns(len(avg_metrics))
+                for col, (name, value) in zip(cols_avg, avg_metrics.items()):
+                    lower_is_better = name in ["LPIPS", "FID", "DISTS"]
+                    delta_color = "inverse" if lower_is_better else "normal"
+
+                    display_val = f"{value:.4f}"
+                    if name == "PSNR":
+                        display_val += " dB"
+                    col.metric(name, display_val, delta_color=delta_color)
+            else:
+                st.info("No numeric metrics to display.")
 
             st.write("### 详细结果 (Detailed Results)")
+            if fid_score is not None:
+                st.caption(
+                    "*Note: FID is calculated globally for the folder and is not shown in the per-image table.*"
+                )
             st.dataframe(df_all)
 
             st.download_button(

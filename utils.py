@@ -163,3 +163,22 @@ def get_image_files(folder_path):
     ]
     files.sort()
     return files
+
+
+def calculate_fid_folder(gt_folder, sr_folder, device=None):
+    """Calculate FID score between two folders."""
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    try:
+        # Create FID metric
+        fid_metric = pyiqa.create_metric("fid", device=device)
+
+        # Calculate FID (distorted_path, reference_path)
+        with torch.no_grad():
+            score = fid_metric(sr_folder, gt_folder)
+
+        return score.item() if isinstance(score, torch.Tensor) else score
+    except Exception as e:
+        print(f"Error calculating FID for folders: {e}")
+        return None
