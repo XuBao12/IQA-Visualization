@@ -146,7 +146,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
     )
 
     # --- Metrics Dashboard ---
-    st.subheader("📊 全局指标 (Metrics)")
+    st.subheader("📊 评估指标 (Metrics)")
 
     with st.spinner("正在计算指标..."):
         metrics = utils.calculate_metrics(
@@ -185,6 +185,87 @@ if img_gt_raw is not None and img_sr_raw is not None:
         file_name="metrics.csv",
         mime="text/csv",
     )
+
+    # --- Batch Evaluation (Server Folder only) ---
+    if input_mode == "Server Folder" and locals().get("valid_files"):
+        st.divider()
+        st.subheader("📚 批量评估 (Batch Evaluation)")
+
+        if st.button("开始计算平均指标 (Calculate Average Metrics)"):
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            all_metrics = []
+
+            total_files = len(valid_files)
+            for i, filename in enumerate(valid_files):
+                status_text.text(f"Processing {i+1}/{total_files}: {filename}")
+
+                f_gt = os.path.join(gt_folder, filename)
+                f_sr = os.path.join(sr_folder, filename)
+
+                try:
+                    i_gt_raw = utils.load_image_from_path(f_gt)
+                    i_sr_raw = utils.load_image_from_path(f_sr)
+
+                    if i_gt_raw is not None and i_sr_raw is not None:
+                        i_gt_p, i_sr_p = utils.preprocess_images(
+                            i_gt_raw, i_sr_raw, crop_border=crop_border
+                        )
+
+                        m = utils.calculate_metrics(
+                            i_gt_p,
+                            i_sr_p,
+                            use_y_channel=use_y_channel,
+                            lpips_net=lpips_net,
+                            selected_metrics=selected_metrics,
+                        )
+                        m["Filename"] = filename
+                        all_metrics.append(m)
+                except Exception as e:
+                    st.warning(f"Failed to process {filename}: {e}")
+
+                progress_bar.progress((i + 1) / total_files)
+
+            status_text.empty()
+
+            if all_metrics:
+                df_all = pd.DataFrame(all_metrics)
+
+                # Move Filename to first column
+                cols = ["Filename"] + [c for c in df_all.columns if c != "Filename"]
+                df_all = df_all[cols]
+                st.session_state["batch_results"] = df_all
+                st.success("Batch Evaluation Completed!")
+            else:
+                st.error("No metrics calculated.")
+
+        if "batch_results" in st.session_state:
+            df_all = st.session_state["batch_results"]
+
+            # Average
+            numeric_cols = df_all.select_dtypes(include=[np.number]).columns
+            avg_metrics = df_all[numeric_cols].mean()
+
+            st.write("### 平均指标 (Average Metrics)")
+            cols_avg = st.columns(len(avg_metrics))
+            for col, (name, value) in zip(cols_avg, avg_metrics.items()):
+                lower_is_better = name in ["LPIPS", "FID", "DISTS"]
+                delta_color = "inverse" if lower_is_better else "normal"
+
+                display_val = f"{value:.4f}"
+                if name == "PSNR":
+                    display_val += " dB"
+                col.metric(name, display_val, delta_color=delta_color)
+
+            st.write("### 详细结果 (Detailed Results)")
+            st.dataframe(df_all)
+
+            st.download_button(
+                label="Download Batch Results as CSV",
+                data=df_all.to_csv(index=False),
+                file_name="batch_metrics.csv",
+                mime="text/csv",
+            )
 
     # --- Visual Comparison ---
     st.subheader("👁️ 可视化对比 (Visual Comparison)")
