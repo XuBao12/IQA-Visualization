@@ -4,7 +4,6 @@ A lightweight web-based tool for Image Quality Assessment(IQA). Built with Strea
 
 ![App Screenshot](fig/app.png)
 
-
 ## ✨ Features
 
 ### 1. Comprehensive Metrics Support
