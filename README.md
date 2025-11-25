@@ -1,10 +1,11 @@
 
-# <img align="left" width="135" height="120" src="fig/logo2.png"> PyTorch Toolbox for Image Quality Assessment
+# <img align="left" width="135" height="120" src="fig/logo2.png"> IQA-Visualization
 
 A lightweight web-based tool for Image Quality Assessment (IQA)
 
 <a href="https://streamlit.io"><img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=flat&logo=streamlit&logoColor=white" alt="Streamlit"></a>
 <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white" alt="Python"></a>
+<a href="https://github.com/chaofengc/IQA-PyTorch"><img src="https://img.shields.io/badge/Backend-PyIQA-blue?style=flat&logo=github&logoColor=white" alt="IQA-PyTorch"></a>
 <a href="https://github.com/XuBao12/IQA-Visualization"><img src="https://img.shields.io/github/stars/XuBao12/IQA-Visualization?style=social" alt="GitHub Stars"></a>
 
 
@@ -13,7 +14,18 @@ A lightweight web-based tool for Image Quality Assessment (IQA)
 **SR-IQA Visualization** is built with Streamlit and PyIQA, providing a comprehensive suite of metrics and visualization tools for researchers to evaluate and compare model results efficiently.
 
 <div align="center">
-  <img src="fig/app.png" width="100%" alt="App Screenshot">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="fig/app1.png" alt="App Screenshot 1" width="100%"/>
+        <br>
+      </td>
+      <td align="center">
+        <img src="fig/app2.png" alt="App Screenshot 2" width="100%"/>
+        <br>
+      </td>
+    </tr>
+  </table>
 </div>
 
 ## ✨ Features
@@ -46,7 +58,7 @@ Calculate a wide range of Full-Reference (FR) and No-Reference (NR) metrics:
 
     ```bash
     git clone git@github.com:XuBao12/IQA-Visualization.git
-    cd sr-iqa-visualizer
+    cd IQA-Visualization
     ```
 
 2.  **Install dependencies**:
