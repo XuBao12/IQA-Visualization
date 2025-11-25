@@ -1,5 +1,6 @@
 streamlit
 streamlit-image-comparison
+streamlit-drawable-canvas
 torch
 torchvision
 numpy

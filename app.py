@@ -7,6 +7,7 @@ import pandas as pd
 import cv2
 from PIL import Image
 import os
+from streamlit_drawable_canvas import st_canvas
 
 # Page Config
 st.set_page_config(
@@ -237,6 +238,108 @@ if img_gt_raw is not None and img_sr_raw is not None:
             ax2.imshow(fft_sr, cmap="gray")
             ax2.axis("off")
             st.pyplot(fig2)
+
+    # --- ROI Crop & Zoom ---
+    st.subheader("✂️ 局部裁剪对比 (ROI Crop)")
+    st.info(
+        "在下方 GT 图像上**点击并拖动鼠标**绘制矩形框，右侧将显示 GT 和 SR 的对应局部放大图。"
+    )
+
+    col_crop_main, col_crop_result = st.columns([1.5, 1])
+
+    with col_crop_main:
+        st.caption("Reference (GT) - Draw Box Here")
+
+        # Prepare image for canvas
+        img_gt_pil = Image.fromarray(img_gt)
+
+        # Calculate canvas dimensions to fit layout
+        canvas_width = 600
+        w_orig, h_orig = img_gt_pil.size
+        if w_orig > 0:
+            scale_factor = canvas_width / w_orig
+            canvas_height = int(h_orig * scale_factor)
+        else:
+            canvas_height = 400
+            scale_factor = 1.0
+
+        # Create Canvas
+        canvas_result = st_canvas(
+            fill_color="rgba(255, 165, 0, 0.3)",
+            stroke_width=2,
+            stroke_color="#FF0000",
+            background_image=img_gt_pil,
+            update_streamlit=True,
+            height=canvas_height,
+            width=canvas_width,
+            drawing_mode="rect",
+            key="roi_canvas",
+            display_toolbar=True,
+        )
+
+    with col_crop_result:
+        st.caption("Cropped Patches (Zoom x4)")
+
+        if (
+            canvas_result.json_data is not None
+            and len(canvas_result.json_data["objects"]) > 0
+        ):
+            # Get the last drawn object
+            obj = canvas_result.json_data["objects"][-1]
+
+            # Get coordinates from canvas
+            left_c = int(obj["left"])
+            top_c = int(obj["top"])
+            width_c = int(obj["width"])
+            height_c = int(obj["height"])
+
+            # Map back to original image coordinates
+            left = int(left_c / scale_factor)
+            top = int(top_c / scale_factor)
+            width = int(width_c / scale_factor)
+            height = int(height_c / scale_factor)
+
+            # Boundary checks
+            left = max(0, min(left, w_orig - 1))
+            top = max(0, min(top, h_orig - 1))
+            width = max(1, min(width, w_orig - left))
+            height = max(1, min(height, h_orig - top))
+
+            if width > 0 and height > 0:
+                # Crop GT
+                patch_gt = img_gt[top : top + height, left : left + width]
+                # Crop SR (same coordinates)
+                patch_sr = img_sr[top : top + height, left : left + width]
+
+                # Zoom
+                zoom_factor = 4
+                h_patch, w_patch, _ = patch_gt.shape
+
+                # Prevent empty patch
+                if h_patch > 0 and w_patch > 0:
+                    patch_gt_zoom = cv2.resize(
+                        patch_gt,
+                        (w_patch * zoom_factor, h_patch * zoom_factor),
+                        interpolation=cv2.INTER_NEAREST,
+                    )
+                    patch_sr_zoom = cv2.resize(
+                        patch_sr,
+                        (w_patch * zoom_factor, h_patch * zoom_factor),
+                        interpolation=cv2.INTER_NEAREST,
+                    )
+
+                    st.image(
+                        patch_gt_zoom, caption="GT Patch", use_container_width=True
+                    )
+                    st.image(
+                        patch_sr_zoom, caption="SR Patch", use_container_width=True
+                    )
+                else:
+                    st.warning("Selected region is too small.")
+            else:
+                st.info("Please select a region.")
+        else:
+            st.info("👈 Please draw a box on the image.")
 
 else:
     st.info("👈 请在左侧侧边栏上传 GT 和 SR 图像以开始分析。")

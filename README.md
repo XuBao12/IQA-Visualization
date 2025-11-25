@@ -27,6 +27,7 @@ Calculate a wide range of Full-Reference (FR) and No-Reference (NR) metrics:
 - **Slider Comparison**: Interactive "Before/After" slider to inspect restoration details.
 - **Error Heatmap**: Visualize pixel-wise absolute differences.
 - **FFT Spectrum**: Frequency domain analysis to detect artifacts or high-frequency loss.
+- **ROI Crop & Zoom**: Draw a custom rectangular box on the reference image to inspect specific regions with 4x magnification.
 
 ## 🛠️ Installation
 
