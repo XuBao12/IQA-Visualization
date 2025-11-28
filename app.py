@@ -71,6 +71,7 @@ with st.sidebar:
     )
 
     st.header("2. 图像输入")
+    st.caption("目前只支持本地路径或者服务器6上路径")
     input_mode = st.radio(
         "输入模式",
         [
@@ -80,6 +81,7 @@ with st.sidebar:
             "服务器路径 文件夹输入",
         ],
         index=0,
+        help="支持本地输入或服务器路径输入，文件夹大于1GB建议从服务器输入",
     )
 
     gt_file = None
