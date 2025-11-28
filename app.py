@@ -129,6 +129,16 @@ with st.sidebar:
                     if st.session_state.current_index >= len(valid_files):
                         st.session_state.current_index = 0
 
+                    # Jump to index
+                    jump_to = st.sidebar.number_input(
+                        "跳转到图片",
+                        min_value=1,
+                        max_value=len(valid_files),
+                        value=st.session_state.current_index + 1,
+                        key="jump_to_server",
+                    )
+                    st.session_state.current_index = jump_to - 1
+
                     # Navigation Buttons
                     col_prev, col_next = st.sidebar.columns(2)
                     if col_prev.button("⬅️ 上一张"):
@@ -153,7 +163,9 @@ with st.sidebar:
                 st.error("无效的文件夹路径。")
 
     elif input_mode == "本地路径 文件夹输入":
-        st.info("💡 提示：Streamlit 不支持直接选择文件夹。请点击下方按钮，进入文件夹后按 `Ctrl+A` 全选所有图片进行上传。")
+        st.info(
+            "💡 提示：Streamlit 不支持直接选择文件夹。请点击下方按钮，进入文件夹后按 `Ctrl+A` 全选所有图片进行上传。"
+        )
         gt_files_upload = st.file_uploader(
             "上传参考图文件夹 (GT) - 请全选图片",
             accept_multiple_files=True,
@@ -183,6 +195,16 @@ with st.sidebar:
                 # Ensure index is valid
                 if st.session_state.current_index >= len(valid_files):
                     st.session_state.current_index = 0
+
+                # Jump to index
+                jump_to = st.sidebar.number_input(
+                    "跳转到图片",
+                    min_value=1,
+                    max_value=len(valid_files),
+                    value=st.session_state.current_index + 1,
+                    key="jump_to_local",
+                )
+                st.session_state.current_index = jump_to - 1
 
                 # Navigation Buttons
                 col_prev, col_next = st.sidebar.columns(2)
