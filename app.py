@@ -75,6 +75,7 @@ with st.sidebar:
         "输入模式",
         [
             "本地路径 单图输入",
+            "本地路径 文件夹输入",
             "服务器路径 单图输入",
             "服务器路径 文件夹输入",
         ],
@@ -85,6 +86,9 @@ with st.sidebar:
     sr_file = None
     gt_path = None
     sr_path = None
+    gt_map = {}
+    sr_map = {}
+    valid_files = []
 
     # Initialize session state for folder navigation
     if "current_index" not in st.session_state:
@@ -146,6 +150,54 @@ with st.sidebar:
             else:
                 st.error("无效的文件夹路径。")
 
+    elif input_mode == "本地路径 文件夹输入":
+        gt_files_upload = st.file_uploader(
+            "上传参考图文件夹 (GT)",
+            accept_multiple_files=True,
+            type=["png", "jpg", "jpeg", "bmp", "tiff"],
+            help="请选择文件夹内的所有图片进行上传",
+        )
+        sr_files_upload = st.file_uploader(
+            "上传失真图文件夹 (SR)",
+            accept_multiple_files=True,
+            type=["png", "jpg", "jpeg", "bmp", "tiff"],
+            help="请选择文件夹内的所有图片进行上传",
+        )
+
+        if gt_files_upload and sr_files_upload:
+            # Create maps
+            gt_map = {f.name: f for f in gt_files_upload}
+            sr_map = {f.name: f for f in sr_files_upload}
+
+            # Find intersection
+            valid_files = sorted(list(set(gt_map.keys()) & set(sr_map.keys())))
+
+            if not valid_files:
+                st.error("在上传的文件中未找到匹配的图像文件（文件名必须相同）。")
+            else:
+                st.sidebar.markdown(f"**找到 {len(valid_files)} 张匹配图像**")
+
+                # Ensure index is valid
+                if st.session_state.current_index >= len(valid_files):
+                    st.session_state.current_index = 0
+
+                # Navigation Buttons
+                col_prev, col_next = st.sidebar.columns(2)
+                if col_prev.button("⬅️ 上一张"):
+                    st.session_state.current_index = max(
+                        0, st.session_state.current_index - 1
+                    )
+                if col_next.button("下一张 ➡️"):
+                    st.session_state.current_index = min(
+                        len(valid_files) - 1, st.session_state.current_index + 1
+                    )
+
+                # Display current file info
+                current_file = valid_files[st.session_state.current_index]
+                st.sidebar.info(
+                    f"当前文件: `{current_file}`\n({st.session_state.current_index + 1}/{len(valid_files)})"
+                )
+
 # --- Main Content ---
 img_gt_raw = None
 img_sr_raw = None
@@ -155,13 +207,19 @@ try:
         if gt_file and sr_file:
             img_gt_raw = utils.load_image(gt_file)
             img_sr_raw = utils.load_image(sr_file)
-    elif (
-        input_mode == "服务器路径 单图输入"
-        or input_mode == "服务器路径 文件夹输入"
-    ):
+    elif input_mode == "服务器路径 单图输入" or input_mode == "服务器路径 文件夹输入":
         if gt_path and sr_path:
             img_gt_raw = utils.load_image_from_path(gt_path)
             img_sr_raw = utils.load_image_from_path(sr_path)
+    elif input_mode == "本地路径 文件夹输入":
+        if valid_files:
+            current_file = valid_files[st.session_state.current_index]
+            f_gt = gt_map[current_file]
+            f_sr = sr_map[current_file]
+            f_gt.seek(0)
+            f_sr.seek(0)
+            img_gt_raw = utils.load_image(f_gt)
+            img_sr_raw = utils.load_image(f_sr)
 except Exception as e:
     st.error(f"加载图像出错: {e}")
 
@@ -213,7 +271,11 @@ if img_gt_raw is not None and img_sr_raw is not None:
     )
 
     # --- Batch Evaluation (Server Folder only) ---
-    if input_mode == "服务器路径 文件夹输入" and locals().get("valid_files"):
+    is_batch_mode = (
+        input_mode == "服务器路径 文件夹输入" or input_mode == "本地路径 文件夹输入"
+    ) and valid_files
+
+    if is_batch_mode:
         st.divider()
         st.subheader("📚 批量评估")
 
@@ -230,12 +292,19 @@ if img_gt_raw is not None and img_sr_raw is not None:
             for i, filename in enumerate(valid_files):
                 status_text.text(f"正在处理 {i+1}/{total_files}: {filename}")
 
-                f_gt = os.path.join(gt_folder, filename)
-                f_sr = os.path.join(sr_folder, filename)
-
                 try:
-                    i_gt_raw = utils.load_image_from_path(f_gt)
-                    i_sr_raw = utils.load_image_from_path(f_sr)
+                    if input_mode == "服务器路径 文件夹输入":
+                        f_gt = os.path.join(gt_folder, filename)
+                        f_sr = os.path.join(sr_folder, filename)
+                        i_gt_raw = utils.load_image_from_path(f_gt)
+                        i_sr_raw = utils.load_image_from_path(f_sr)
+                    else:  # Local Upload
+                        f_gt = gt_map[filename]
+                        f_sr = sr_map[filename]
+                        f_gt.seek(0)
+                        f_sr.seek(0)
+                        i_gt_raw = utils.load_image(f_gt)
+                        i_sr_raw = utils.load_image(f_sr)
 
                     if i_gt_raw is not None and i_sr_raw is not None:
                         i_gt_p, i_sr_p = utils.preprocess_images(
@@ -262,9 +331,14 @@ if img_gt_raw is not None and img_sr_raw is not None:
             # Calculate FID globally
             fid_score = None
             if calc_fid:
-                status_text.text("正在计算 FID... (这可能需要一些时间)")
-                with st.spinner("正在计算 FID..."):
-                    fid_score = utils.calculate_fid_folder(gt_folder, sr_folder)
+                if input_mode == "服务器路径 文件夹输入":
+                    status_text.text("正在计算 FID... (这可能需要一些时间)")
+                    with st.spinner("正在计算 FID..."):
+                        fid_score = utils.calculate_fid_folder(gt_folder, sr_folder)
+                else:
+                    st.warning(
+                        "注意：本地上传模式暂不支持计算文件夹级 FID (需要物理路径)。"
+                    )
 
             status_text.empty()
 
@@ -324,9 +398,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
     # --- Visual Comparison ---
     st.subheader("👁️ 可视化对比")
 
-    tab1, tab2, tab3 = st.tabs(
-        ["↔️ 滑块对比", "🔥 误差热力图", "📈 频谱分析"]
-    )
+    tab1, tab2, tab3 = st.tabs(["↔️ 滑块对比", "🔥 误差热力图", "📈 频谱分析"])
 
     with tab1:
         st.write("左右拖动滑块对比细节：")
