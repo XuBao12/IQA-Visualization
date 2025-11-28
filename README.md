@@ -63,6 +63,8 @@ Calculate a wide range of Full-Reference (FR) and No-Reference (NR) metrics:
 
 2.  **Install dependencies**:
     ```bash
+    conda create -n iqasr python=3.10 -y
+    conda activate iqasr
     pip install -r requirements.txt
     ```
 
