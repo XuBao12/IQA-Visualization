@@ -95,38 +95,45 @@ def calculate_metrics(
     tensor_gt = to_tensor(img_gt).to(device)
     tensor_sr = to_tensor(img_sr).to(device)
 
-    # Define metric configurations
-    # Key: Display Name, Value: (pyiqa_name, is_fr, kwargs)
-    metric_configs = {
-        "PSNR": ("psnr", True, {"test_y_channel": use_y_channel}),
-        "SSIM": ("ssim", True, {"test_y_channel": use_y_channel}),
-        "LPIPS": ("lpips", True, {"net": lpips_net}),
-        "DISTS": ("dists", True, {}),
-        "FID": ("fid", True, {}),  # Note: FID on single image pair is non-standard
-        "CLIPIQA": ("clipiqa", False, {}),
-        "CNNIQA": ("cnniqa", False, {}),
-        "MUSIQ": ("musiq", False, {}),
-    }
+    try:
+        # Define metric configurations
+        # Key: Display Name, Value: (pyiqa_name, is_fr, kwargs)
+        metric_configs = {
+            "PSNR": ("psnr", True, {"test_y_channel": use_y_channel}),
+            "SSIM": ("ssim", True, {"test_y_channel": use_y_channel}),
+            "LPIPS": ("lpips", True, {"net": lpips_net}),
+            "DISTS": ("dists", True, {}),
+            "FID": ("fid", True, {}),  # Note: FID on single image pair is non-standard
+            "CLIPIQA": ("clipiqa", False, {}),
+            "CNNIQA": ("cnniqa", False, {}),
+            "MUSIQ": ("musiq", False, {}),
+        }
 
-    for name in selected_metrics:
-        if name not in metric_configs:
-            continue
+        for name in selected_metrics:
+            if name not in metric_configs:
+                continue
 
-        pyiqa_name, is_fr, kwargs = metric_configs[name]
+            pyiqa_name, is_fr, kwargs = metric_configs[name]
 
-        try:
-            metric_func = get_pyiqa_metric(pyiqa_name, device=device, **kwargs)
+            try:
+                metric_func = get_pyiqa_metric(pyiqa_name, device=device, **kwargs)
 
-            with torch.no_grad():
-                if is_fr:
-                    score = metric_func(tensor_sr, tensor_gt).item()
-                else:
-                    score = metric_func(tensor_sr).item()
+                with torch.no_grad():
+                    if is_fr:
+                        score = metric_func(tensor_sr, tensor_gt).item()
+                    else:
+                        score = metric_func(tensor_sr).item()
 
-            metrics[name] = score
-        except Exception as e:
-            print(f"Error calculating {name}: {e}")
-            metrics[name] = float("nan")
+                metrics[name] = score
+            except Exception as e:
+                print(f"Error calculating {name}: {e}")
+                metrics[name] = float("nan")
+    finally:
+        # Cleanup tensors to free GPU memory
+        del tensor_gt
+        del tensor_sr
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     return metrics
 

@@ -449,6 +449,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
         plt.colorbar(im, ax=ax)
         ax.axis("off")
         st.pyplot(fig)
+        plt.close(fig)
 
     with tab3:
         st.write("频域分析: 检查高频信息丢失或伪影。")
@@ -463,6 +464,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
             ax1.imshow(fft_gt, cmap="gray")
             ax1.axis("off")
             st.pyplot(fig1)
+            plt.close(fig1)
 
         with col_fft2:
             st.caption("SR 频谱")
@@ -470,6 +472,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
             ax2.imshow(fft_sr, cmap="gray")
             ax2.axis("off")
             st.pyplot(fig2)
+            plt.close(fig2)
 
     # --- ROI Crop & Zoom ---
     st.subheader("✂️ 局部裁剪对比")
