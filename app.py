@@ -304,7 +304,8 @@ if img_gt_raw is not None and img_sr_raw is not None:
         st.divider()
         st.subheader("📚 批量评估")
 
-        if st.button("开始计算平均指标"):
+        col_start, col_copy, _ = st.columns([1.2, 1.8, 7], gap="small")
+        if col_start.button("开始计算平均指标"):
             progress_bar = st.progress(0)
             status_text = st.empty()
             all_metrics = []
@@ -403,6 +404,76 @@ if img_gt_raw is not None and img_sr_raw is not None:
                     if name == "PSNR":
                         display_val += " dB"
                     col.metric(name, display_val, delta_color=delta_color)
+
+                # Copy friendly format
+                avg_df = pd.DataFrame([avg_metrics])
+
+                # Generate HTML table (No Header)
+                html_table = avg_df.to_html(
+                    index=False, header=False, float_format="%.4f", border=1
+                )
+
+                # Embed HTML with Copy Button using components
+                import streamlit.components.v1 as components
+
+                with col_copy:
+                    components.html(
+                        f"""
+                        <style>
+                            body {{ margin: 0; font-family: "Source Sans Pro", sans-serif; }}
+                            .btn {{
+                                display: inline-flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-weight: 400;
+                                padding: 0.25rem 0.75rem;
+                                border-radius: 0.5rem;
+                                min-height: 38.4px;
+                                margin: 0px;
+                                line-height: 1.6;
+                                color: rgb(49, 51, 63);
+                                background-color: rgb(255, 255, 255);
+                                border: 1px solid rgba(49, 51, 63, 0.2);
+                                font-size: 1rem;
+                                cursor: pointer;
+                                gap: 8px;
+                            }}
+                            .btn:hover {{
+                                border-color: rgb(255, 75, 75);
+                                color: rgb(255, 75, 75);
+                            }}
+                            .btn:active {{
+                                background-color: rgb(255, 75, 75);
+                                color: white;
+                            }}
+                        </style>
+                        <script>
+                            function copyTable() {{
+                                const table = document.getElementById('data-table');
+                                const range = document.createRange();
+                                range.selectNode(table);
+                                window.getSelection().removeAllRanges();
+                                window.getSelection().addRange(range);
+                                try {{
+                                    document.execCommand('copy');
+                                    const btn = document.getElementById('copy-btn');
+                                    btn.innerHTML = '✅ 已复制！';
+                                    setTimeout(() => {{ btn.innerHTML = '复制结果'; }}, 2000);
+                                }} catch (err) {{
+                                    alert('复制失败');
+                                }}
+                                window.getSelection().removeAllRanges();
+                            }}
+                        </script>
+                        <div style="display: flex; align-items: center;">
+                            <button id="copy-btn" class="btn" onclick="copyTable()">复制结果</button>
+                            <div id="data-table" style="position: absolute; left: -9999px;">
+                                {html_table}
+                            </div>
+                        </div>
+                        """,
+                        height=45,
+                    )
             else:
                 st.info("没有可显示的数值指标。")
 
