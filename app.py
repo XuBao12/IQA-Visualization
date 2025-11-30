@@ -268,8 +268,11 @@ if img_gt_raw is not None and img_sr_raw is not None:
 
     # Dynamic display of metrics
     if metrics:
-        cols = st.columns(len(metrics))
-        for col, (name, value) in zip(cols, metrics.items()):
+        # Sort metrics based on selection order
+        ordered_metrics = {k: metrics[k] for k in selected_metrics if k in metrics}
+
+        cols = st.columns(len(ordered_metrics))
+        for col, (name, value) in zip(cols, ordered_metrics.items()):
             # Determine delta color (LPIPS, FID, DISTS are lower is better)
             lower_is_better = name in ["LPIPS", "FID", "DISTS"]
             delta_color = "inverse" if lower_is_better else "normal"
@@ -288,12 +291,86 @@ if img_gt_raw is not None and img_sr_raw is not None:
 
     # Export Data
     metrics_df = pd.DataFrame([metrics])
-    st.download_button(
-        label="下载 CSV",
-        data=metrics_df.to_csv(index=False),
-        file_name="metrics.csv",
-        mime="text/csv",
+    # Reorder columns for CSV
+    if metrics:
+        cols_order = [c for c in selected_metrics if c in metrics_df.columns]
+        metrics_df = metrics_df[cols_order]
+
+    col_dl, col_cp, _ = st.columns([1, 1.5, 5], gap="small")
+
+    with col_dl:
+        st.download_button(
+            label="下载 CSV",
+            data=metrics_df.to_csv(index=False),
+            file_name="metrics.csv",
+            mime="text/csv",
+        )
+
+    # Generate HTML table (No Header)
+    html_table_single = metrics_df.to_html(
+        index=False, header=False, float_format="%.4f", border=1
     )
+
+    import streamlit.components.v1 as components
+
+    with col_cp:
+        components.html(
+            f"""
+            <style>
+                body {{ margin: 0; font-family: "Source Sans Pro", sans-serif; }}
+                .btn {{
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 400;
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 0.5rem;
+                    min-height: 38.4px;
+                    margin: 0px;
+                    line-height: 1.6;
+                    color: rgb(49, 51, 63);
+                    background-color: rgb(255, 255, 255);
+                    border: 1px solid rgba(49, 51, 63, 0.2);
+                    font-size: 1rem;
+                    cursor: pointer;
+                    gap: 8px;
+                }}
+                .btn:hover {{
+                    border-color: rgb(255, 75, 75);
+                    color: rgb(255, 75, 75);
+                }}
+                .btn:active {{
+                    background-color: rgb(255, 75, 75);
+                    color: white;
+                }}
+            </style>
+            <script>
+                function copyTableSingle() {{
+                    const table = document.getElementById('data-table-single');
+                    const range = document.createRange();
+                    range.selectNode(table);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                    try {{
+                        document.execCommand('copy');
+                        const btn = document.getElementById('copy-btn-single');
+                        btn.innerHTML = '✅ 已复制！';
+                        setTimeout(() => {{ btn.innerHTML = '复制结果'; }}, 2000);
+                    }} catch (err) {{
+                        alert('复制失败');
+                    }}
+                    window.getSelection().removeAllRanges();
+                }}
+            </script>
+            <div style="display: flex; align-items: center;">
+                <button id="copy-btn-single" class="btn" onclick="copyTableSingle()">复制结果</button>
+                <div id="data-table-single" style="position: absolute; left: -9999px;">
+                    {html_table_single}
+                </div>
+            </div>
+            """,
+            height=45,
+        )
 
     # --- Batch Evaluation (Server Folder only) ---
     is_batch_mode = (
@@ -304,8 +381,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
         st.divider()
         st.subheader("📚 批量评估")
 
-        col_start, col_copy, _ = st.columns([1.2, 1.8, 7], gap="small")
-        if col_start.button("开始计算平均指标"):
+        if st.button("开始计算平均指标"):
             progress_bar = st.progress(0)
             status_text = st.empty()
             all_metrics = []
@@ -371,10 +447,14 @@ if img_gt_raw is not None and img_sr_raw is not None:
             if all_metrics:
                 df_all = pd.DataFrame(all_metrics)
 
-                # Move Filename to first column
-                if "Filename" in df_all.columns:
-                    cols = ["Filename"] + [c for c in df_all.columns if c != "Filename"]
-                    df_all = df_all[cols]
+                # Move Filename to first column and reorder metrics
+                cols = ["Filename"]
+                # Add metrics in selection order
+                cols += [c for c in selected_metrics if c in df_all.columns]
+                # Add any remaining columns (like FID if calculated separately but not in selection list logic)
+                cols += [c for c in df_all.columns if c not in cols]
+
+                df_all = df_all[cols]
 
                 st.session_state["batch_results"] = df_all
                 st.session_state["batch_fid"] = fid_score
@@ -395,8 +475,17 @@ if img_gt_raw is not None and img_sr_raw is not None:
 
             st.write("### 平均指标")
             if not avg_metrics.empty:
-                cols_avg = st.columns(len(avg_metrics))
-                for col, (name, value) in zip(cols_avg, avg_metrics.items()):
+                # Sort average metrics based on selection order
+                ordered_avg_metrics = {
+                    k: avg_metrics[k] for k in selected_metrics if k in avg_metrics
+                }
+                # Add any remaining metrics (like FID)
+                for k, v in avg_metrics.items():
+                    if k not in ordered_avg_metrics:
+                        ordered_avg_metrics[k] = v
+
+                cols_avg = st.columns(len(ordered_avg_metrics))
+                for col, (name, value) in zip(cols_avg, ordered_avg_metrics.items()):
                     lower_is_better = name in ["LPIPS", "FID", "DISTS"]
                     delta_color = "inverse" if lower_is_better else "normal"
 
@@ -406,76 +495,12 @@ if img_gt_raw is not None and img_sr_raw is not None:
                     col.metric(name, display_val, delta_color=delta_color)
 
                 # Copy friendly format
-                avg_df = pd.DataFrame([avg_metrics])
+                avg_df = pd.DataFrame([ordered_avg_metrics])
 
                 # Generate HTML table (No Header)
                 html_table = avg_df.to_html(
                     index=False, header=False, float_format="%.4f", border=1
                 )
-
-                # Embed HTML with Copy Button using components
-                import streamlit.components.v1 as components
-
-                with col_copy:
-                    components.html(
-                        f"""
-                        <style>
-                            body {{ margin: 0; font-family: "Source Sans Pro", sans-serif; }}
-                            .btn {{
-                                display: inline-flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-weight: 400;
-                                padding: 0.25rem 0.75rem;
-                                border-radius: 0.5rem;
-                                min-height: 38.4px;
-                                margin: 0px;
-                                line-height: 1.6;
-                                color: rgb(49, 51, 63);
-                                background-color: rgb(255, 255, 255);
-                                border: 1px solid rgba(49, 51, 63, 0.2);
-                                font-size: 1rem;
-                                cursor: pointer;
-                                gap: 8px;
-                            }}
-                            .btn:hover {{
-                                border-color: rgb(255, 75, 75);
-                                color: rgb(255, 75, 75);
-                            }}
-                            .btn:active {{
-                                background-color: rgb(255, 75, 75);
-                                color: white;
-                            }}
-                        </style>
-                        <script>
-                            function copyTable() {{
-                                const table = document.getElementById('data-table');
-                                const range = document.createRange();
-                                range.selectNode(table);
-                                window.getSelection().removeAllRanges();
-                                window.getSelection().addRange(range);
-                                try {{
-                                    document.execCommand('copy');
-                                    const btn = document.getElementById('copy-btn');
-                                    btn.innerHTML = '✅ 已复制！';
-                                    setTimeout(() => {{ btn.innerHTML = '复制结果'; }}, 2000);
-                                }} catch (err) {{
-                                    alert('复制失败');
-                                }}
-                                window.getSelection().removeAllRanges();
-                            }}
-                        </script>
-                        <div style="display: flex; align-items: center;">
-                            <button id="copy-btn" class="btn" onclick="copyTable()">复制结果</button>
-                            <div id="data-table" style="position: absolute; left: -9999px;">
-                                {html_table}
-                            </div>
-                        </div>
-                        """,
-                        height=45,
-                    )
-            else:
-                st.info("没有可显示的数值指标。")
 
             st.write("### 详细结果")
             if fid_score is not None:
@@ -484,12 +509,74 @@ if img_gt_raw is not None and img_sr_raw is not None:
                 )
             st.dataframe(df_all)
 
-            st.download_button(
-                label="下载批量结果 CSV",
-                data=df_all.to_csv(index=False),
-                file_name="batch_metrics.csv",
-                mime="text/csv",
-            )
+            col_dl_batch, col_cp_batch, _ = st.columns([1, 1.5, 5], gap="small")
+
+            with col_dl_batch:
+                st.download_button(
+                    label="下载批量结果 CSV",
+                    data=df_all.to_csv(index=False),
+                    file_name="batch_metrics.csv",
+                    mime="text/csv",
+                )
+
+            with col_cp_batch:
+                components.html(
+                    f"""
+                    <style>
+                        body {{ margin: 0; font-family: "Source Sans Pro", sans-serif; }}
+                        .btn {{
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-weight: 400;
+                            padding: 0.25rem 0.75rem;
+                            border-radius: 0.5rem;
+                            min-height: 38.4px;
+                            margin: 0px;
+                            line-height: 1.6;
+                            color: rgb(49, 51, 63);
+                            background-color: rgb(255, 255, 255);
+                            border: 1px solid rgba(49, 51, 63, 0.2);
+                            font-size: 1rem;
+                            cursor: pointer;
+                            gap: 8px;
+                        }}
+                        .btn:hover {{
+                            border-color: rgb(255, 75, 75);
+                            color: rgb(255, 75, 75);
+                        }}
+                        .btn:active {{
+                            background-color: rgb(255, 75, 75);
+                            color: white;
+                        }}
+                    </style>
+                    <script>
+                        function copyTable() {{
+                            const table = document.getElementById('data-table');
+                            const range = document.createRange();
+                            range.selectNode(table);
+                            window.getSelection().removeAllRanges();
+                            window.getSelection().addRange(range);
+                            try {{
+                                document.execCommand('copy');
+                                const btn = document.getElementById('copy-btn');
+                                btn.innerHTML = '✅ 已复制！';
+                                setTimeout(() => {{ btn.innerHTML = '复制结果'; }}, 2000);
+                            }} catch (err) {{
+                                alert('复制失败');
+                            }}
+                            window.getSelection().removeAllRanges();
+                        }}
+                    </script>
+                    <div style="display: flex; align-items: center;">
+                        <button id="copy-btn" class="btn" onclick="copyTable()">复制结果</button>
+                        <div id="data-table" style="position: absolute; left: -9999px;">
+                            {html_table}
+                        </div>
+                    </div>
+                    """,
+                    height=45,
+                )
 
     # --- Visual Comparison ---
     st.subheader("👁️ 可视化对比")
