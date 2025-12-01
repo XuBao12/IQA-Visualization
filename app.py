@@ -71,7 +71,7 @@ with st.sidebar:
     )
 
     st.header("2. 图像输入")
-    st.caption("目前只支持本地路径或者服务器6上路径")
+    st.caption("支持输入本地路径或者服务器6上路径")
     input_mode = st.radio(
         "输入模式",
         [
@@ -581,7 +581,16 @@ if img_gt_raw is not None and img_sr_raw is not None:
     # --- Visual Comparison ---
     st.subheader("👁️ 可视化对比")
 
-    tab1, tab2, tab3 = st.tabs(["↔️ 滑块对比", "🔥 误差热力图", "📈 频谱分析"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        [
+            "↔️ 滑块对比",
+            "🖼️ 原图对比",
+            "🔥 误差热力图",
+            "📈 频谱分析",
+            "🧶 纹理分析",
+            "📏 边缘分析",
+        ]
+    )
 
     with tab1:
         st.write("左右拖动滑块对比细节：")
@@ -599,6 +608,14 @@ if img_gt_raw is not None and img_sr_raw is not None:
         )
 
     with tab2:
+        st.write("原图对比：左侧为参考图 (GT)，右侧为失真图 (SR)。")
+        col_orig1, col_orig2 = st.columns(2)
+        with col_orig1:
+            st.image(img_gt, caption="参考图 (GT)", use_container_width=True)
+        with col_orig2:
+            st.image(img_sr, caption="失真图 (SR)", use_container_width=True)
+
+    with tab3:
         st.write("差值热力图: 颜色越亮表示误差越大。")
         error_map = utils.get_error_map(img_gt, img_sr)
 
@@ -609,28 +626,148 @@ if img_gt_raw is not None and img_sr_raw is not None:
         st.pyplot(fig)
         plt.close(fig)
 
-    with tab3:
+    with tab4:
         st.write("频域分析: 检查高频信息丢失或伪影。")
-        fft_gt = utils.get_fft_spectrum(img_gt)
-        fft_sr = utils.get_fft_spectrum(img_sr)
 
-        col_fft1, col_fft2 = st.columns(2)
+        ftab1, ftab2, ftab3, ftab4 = st.tabs(
+            ["2D 频谱图", "1D 功率谱", "差异曲线", "MTF 曲线"]
+        )
 
-        with col_fft1:
-            st.caption("GT 频谱")
-            fig1, ax1 = plt.subplots()
-            ax1.imshow(fft_gt, cmap="gray")
-            ax1.axis("off")
-            st.pyplot(fig1)
-            plt.close(fig1)
+        with ftab1:
+            fft_gt = utils.get_fft_spectrum(img_gt)
+            fft_sr = utils.get_fft_spectrum(img_sr)
 
-        with col_fft2:
-            st.caption("SR 频谱")
-            fig2, ax2 = plt.subplots()
-            ax2.imshow(fft_sr, cmap="gray")
-            ax2.axis("off")
-            st.pyplot(fig2)
-            plt.close(fig2)
+            col_fft1, col_fft2 = st.columns(2)
+
+            with col_fft1:
+                st.caption("GT 频谱")
+                fig1, ax1 = plt.subplots()
+                ax1.imshow(fft_gt, cmap="gray")
+                ax1.axis("off")
+                st.pyplot(fig1)
+                plt.close(fig1)
+
+            with col_fft2:
+                st.caption("SR 频谱")
+                fig2, ax2 = plt.subplots()
+                ax2.imshow(fft_sr, cmap="gray")
+                ax2.axis("off")
+                st.pyplot(fig2)
+                plt.close(fig2)
+
+        # Calculate 1D PSD for tab2 and tab3
+        psd_gt = utils.get_1d_power_spectrum(img_gt)
+        psd_sr = utils.get_1d_power_spectrum(img_sr)
+
+        # Ensure same length for plotting
+        min_len = min(len(psd_gt), len(psd_sr))
+        psd_gt = psd_gt[:min_len]
+        psd_sr = psd_sr[:min_len]
+
+        with ftab2:
+            st.write("#### 1D 功率谱对比")
+            # Plot 1D Power Spectrum
+            fig_1d, ax_1d = plt.subplots(figsize=(10, 4))
+            ax_1d.plot(np.log10(psd_gt + 1e-8), label="GT", alpha=0.8, linewidth=1.5)
+            ax_1d.plot(np.log10(psd_sr + 1e-8), label="SR", alpha=0.8, linewidth=1.5)
+            ax_1d.set_xlabel("Frequency (Radius)")
+            ax_1d.set_ylabel("Log Power")
+            ax_1d.set_title("1D Power Spectrum")
+            ax_1d.legend()
+            ax_1d.grid(True, alpha=0.3)
+            st.pyplot(fig_1d)
+            plt.close(fig_1d)
+
+        with ftab3:
+            st.write("#### SR 与 GT 差异曲线 (Log Power Difference)")
+            st.caption("值 > 0 表示 SR 在该频率分量能量高于 GT，值 < 0 表示低于 GT。")
+
+            diff_curve = np.log10(psd_sr + 1e-8) - np.log10(psd_gt + 1e-8)
+
+            fig_diff, ax_diff = plt.subplots(figsize=(10, 4))
+            ax_diff.plot(diff_curve, label="SR - GT", color="red", linewidth=1.5)
+            ax_diff.axhline(0, color="black", linestyle="--", alpha=0.5)
+            ax_diff.set_xlabel("Frequency (Radius)")
+            ax_diff.set_ylabel("Difference (Log Power)")
+            ax_diff.set_title("Spectrum Difference")
+            ax_diff.legend()
+            ax_diff.grid(True, alpha=0.3)
+            st.pyplot(fig_diff)
+            plt.close(fig_diff)
+
+        with ftab4:
+            st.write("#### MTF 曲线 (Modulation Transfer Function)")
+            st.caption(
+                "近似计算：SR 与 GT 的幅度谱之比 (Magnitude Spectrum Ratio)。值 = 1 表示完美还原，> 1 表示锐化/伪影，< 1 表示模糊。"
+            )
+
+            # Calculate MTF: sqrt(PSD_SR) / sqrt(PSD_GT)
+            mtf_curve = np.sqrt(psd_sr) / (np.sqrt(psd_gt) + 1e-8)
+
+            fig_mtf, ax_mtf = plt.subplots(figsize=(10, 4))
+            ax_mtf.plot(mtf_curve, label="MTF (SR / GT)", color="purple", linewidth=1.5)
+            ax_mtf.axhline(
+                1, color="black", linestyle="--", alpha=0.5, label="Ideal (1.0)"
+            )
+            ax_mtf.set_xlabel("Frequency (Radius)")
+            ax_mtf.set_ylabel("Relative Response")
+            ax_mtf.set_title("Approximate MTF Curve")
+            ax_mtf.legend()
+            ax_mtf.grid(True, alpha=0.3)
+            ax_mtf.set_ylim(0, 2.0)
+            st.pyplot(fig_mtf)
+            plt.close(fig_mtf)
+
+    with tab5:
+        st.write("纹理一致性分析: 使用 Gabor 滤波器组提取纹理能量和主方向。")
+
+        with st.spinner("正在进行纹理分析..."):
+            energy_gt, orient_gt = utils.get_texture_analysis(img_gt)
+            energy_sr, orient_sr = utils.get_texture_analysis(img_sr)
+
+        st.write("#### 1. 纹理能量图 (Texture Energy)")
+        st.caption("颜色越亮表示该区域纹理越丰富/高频能量越强。")
+        col_tex1, col_tex2 = st.columns(2)
+        with col_tex1:
+            st.image(energy_gt, caption="GT 纹理能量", use_container_width=True)
+        with col_tex2:
+            st.image(energy_sr, caption="SR 纹理能量", use_container_width=True)
+
+        st.write("#### 2. 纹理方向图 (Texture Orientation)")
+        st.caption("不同颜色代表不同的纹理主方向，亮度代表纹理强度。")
+        col_ori1, col_ori2 = st.columns(2)
+        with col_ori1:
+            st.image(orient_gt, caption="GT 纹理方向", use_container_width=True)
+        with col_ori2:
+            st.image(orient_sr, caption="SR 纹理方向", use_container_width=True)
+
+    with tab6:
+        st.write("边缘分析: 对比 GT 与 SR 的边缘结构，检查是否丢失细节或产生伪影。")
+
+        edge_method = st.radio(
+            "选择边缘检测算子", ["Canny", "Sobel", "Laplacian"], horizontal=True
+        )
+
+        edge_gt = utils.get_edge_analysis(img_gt, method=edge_method)
+        edge_sr = utils.get_edge_analysis(img_sr, method=edge_method)
+
+        col_edge1, col_edge2 = st.columns(2)
+        with col_edge1:
+            st.image(
+                edge_gt, caption=f"GT 边缘 ({edge_method})", use_container_width=True
+            )
+        with col_edge2:
+            st.image(
+                edge_sr, caption=f"SR 边缘 ({edge_method})", use_container_width=True
+            )
+
+        st.write("#### 边缘差异图 (Edge Difference)")
+        st.caption("显示 SR 与 GT 边缘图的差异。")
+
+        # Calculate difference
+        edge_diff = cv2.absdiff(edge_gt, edge_sr)
+
+        st.image(edge_diff, caption="边缘差异 (绝对差值)", clamp=True, channels="GRAY")
 
     # --- ROI Crop & Zoom ---
     st.subheader("✂️ 局部裁剪对比")

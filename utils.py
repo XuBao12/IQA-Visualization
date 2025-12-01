@@ -158,6 +158,37 @@ def get_fft_spectrum(img):
     return magnitude_spectrum
 
 
+def get_1d_power_spectrum(img):
+    """Compute 1D radially averaged power spectrum."""
+    # Convert to grayscale
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = img
+
+    f = np.fft.fft2(gray)
+    fshift = np.fft.fftshift(f)
+    # Power spectrum
+    psd2D = np.abs(fshift) ** 2
+
+    # Calculate radial profile
+    h, w = psd2D.shape
+    center_y, center_x = h // 2, w // 2
+
+    y, x = np.indices((h, w))
+    r = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+    r = r.astype(int)
+
+    # Average PSD at each radius
+    tbin = np.bincount(r.ravel(), psd2D.ravel())
+    nr = np.bincount(r.ravel())
+
+    # Avoid division by zero
+    radial_profile = tbin / (nr + 1e-8)
+
+    return radial_profile
+
+
 def get_image_files(folder_path):
     """Return a sorted list of image files in the folder."""
     if not os.path.exists(folder_path):
@@ -189,3 +220,98 @@ def calculate_fid_folder(gt_folder, sr_folder, device=None):
     except Exception as e:
         print(f"Error calculating FID for folders: {e}")
         return None
+
+
+def get_texture_analysis(img):
+    """
+    Analyze texture using Gabor filters.
+    Returns:
+        energy_vis: RGB image of texture energy (Heatmap).
+        orientation_vis: RGB image of dominant orientation (Color-coded).
+    """
+    # Define filters
+    filters = []
+    ksize = 21  # Kernel size
+    num_thetas = 8  # Number of orientations
+    for i in range(num_thetas):
+        theta = i * np.pi / num_thetas
+        # sigma, theta, lambd, gamma, psi
+        kern = cv2.getGaborKernel(
+            (ksize, ksize), 3.0, theta, 8.0, 0.5, 0, ktype=cv2.CV_32F
+        )
+        filters.append(kern)
+
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = img
+
+    accum_energy = np.zeros_like(gray, dtype=np.float32)
+    max_response = np.zeros_like(gray, dtype=np.float32) - 1e9
+    orientation_idx = np.zeros_like(gray, dtype=np.uint8)
+
+    for i, kern in enumerate(filters):
+        fimg = cv2.filter2D(gray, cv2.CV_32F, kern)
+
+        # Energy (Sum of squared responses)
+        accum_energy += fimg * fimg
+
+        # Orientation (Index of max response)
+        mask = fimg > max_response
+        max_response[mask] = fimg[mask]
+        orientation_idx[mask] = i
+
+    # Visualize Energy
+    # Normalize to 0-255
+    energy_norm = cv2.normalize(accum_energy, None, 0, 255, cv2.NORM_MINMAX).astype(
+        np.uint8
+    )
+    energy_vis = cv2.applyColorMap(energy_norm, cv2.COLORMAP_INFERNO)
+    energy_vis = cv2.cvtColor(energy_vis, cv2.COLOR_BGR2RGB)
+
+    # Visualize Orientation
+    # Use HSV: Hue = Orientation, Value = Response Strength
+    hue = (orientation_idx.astype(np.float32) / num_thetas * 180).astype(np.uint8)
+    sat = np.ones_like(hue) * 255
+    # Normalize max response for Value channel
+    val = cv2.normalize(max_response, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+    hsv = cv2.merge([hue, sat, val])
+    orientation_vis = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+
+    return energy_vis, orientation_vis
+
+
+def get_edge_analysis(img, method="Canny"):
+    """
+    Extract edge map using specified method.
+    method: 'Canny', 'Sobel', 'Laplacian'
+    """
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = img
+
+    if method == "Canny":
+        # Use median-based automatic thresholding
+        v = np.median(gray)
+        sigma = 0.33
+        lower = int(max(0, (1.0 - sigma) * v))
+        upper = int(min(255, (1.0 + sigma) * v))
+        edges = cv2.Canny(gray, lower, upper)
+        return edges
+    elif method == "Sobel":
+        # Gradient magnitude
+        sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+        mag = np.sqrt(sobelx**2 + sobely**2)
+        # Normalize to 0-255
+        mag = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        return mag
+    elif method == "Laplacian":
+        lap = cv2.Laplacian(gray, cv2.CV_64F)
+        lap = np.abs(lap)
+        lap = cv2.normalize(lap, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        return lap
+    else:
+        return gray
