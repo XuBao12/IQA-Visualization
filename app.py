@@ -455,6 +455,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
                 cols += [c for c in df_all.columns if c not in cols]
 
                 df_all = df_all[cols]
+                df_all.index = range(1, len(df_all) + 1)
 
                 st.session_state["batch_results"] = df_all
                 st.session_state["batch_fid"] = fid_score
