@@ -1,4 +1,3 @@
-
 # <img align="left" width="135" height="120" src="fig/logo2.png"> IQA-Visualization
 
 A lightweight web-based tool for Image Quality Assessment (IQA)
@@ -7,7 +6,6 @@ A lightweight web-based tool for Image Quality Assessment (IQA)
 <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white" alt="Python"></a>
 <a href="https://github.com/chaofengc/IQA-PyTorch"><img src="https://img.shields.io/badge/Backend-PyIQA-blue?style=flat&logo=github&logoColor=white" alt="IQA-PyTorch"></a>
 <a href="https://github.com/XuBao12/IQA-Visualization"><img src="https://img.shields.io/github/stars/XuBao12/IQA-Visualization?style=social" alt="GitHub Stars"></a>
-
 
 ## 📖 Introduction
 
@@ -48,8 +46,19 @@ Calculate a wide range of Full-Reference (FR) and No-Reference (NR) metrics:
 ### 3. Advanced Visualization
 
 - **Slider Comparison**: Interactive "Before/After" slider to inspect restoration details.
+- **Original Image Comparison**: Side-by-side view of full GT and SR images.
 - **Error Heatmap**: Visualize pixel-wise absolute differences.
-- **FFT Spectrum**: Frequency domain analysis to detect artifacts or high-frequency loss.
+- **Frequency Domain Analysis**:
+  - **2D Spectrum**: Visual inspection of frequency components.
+  - **1D Power Spectrum**: Radially averaged power spectrum comparison.
+  - **Difference Curve**: Log-power difference to detect blur or high-frequency artifacts.
+  - **MTF Curve**: Approximate Modulation Transfer Function to evaluate sharpness.
+- **Texture Analysis**:
+  - **Texture Energy**: Gabor filter-based energy map to visualize texture richness.
+  - **Texture Orientation**: Color-coded map showing dominant texture directions.
+- **Edge Analysis**:
+  - **Edge Detection**: Supports Canny, Sobel, and Laplacian operators.
+  - **Edge Difference**: Visualizes structural edge errors.
 - **ROI Crop & Zoom**: Draw a custom rectangular box on the reference image to inspect specific regions with 4x magnification.
 
 ## 🛠️ Installation
