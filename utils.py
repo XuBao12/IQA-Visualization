@@ -110,6 +110,15 @@ def calculate_metrics(
         }
 
         for name in selected_metrics:
+            if name == "Frequency L1":
+                try:
+                    score = calculate_frequency_L1(img_gt, img_sr)
+                    metrics[name] = score
+                except Exception as e:
+                    print(f"Error calculating Frequency L1: {e}")
+                    metrics[name] = float("nan")
+                continue
+
             if name not in metric_configs:
                 continue
 
@@ -169,7 +178,7 @@ def get_1d_power_spectrum(img):
     f = np.fft.fft2(gray)
     fshift = np.fft.fftshift(f)
     # Power spectrum
-    psd2D = np.abs(fshift) ** 2
+    psd2D = (np.abs(fshift) ** 2) / (img.shape[0] * img.shape[1])
 
     # Calculate radial profile
     h, w = psd2D.shape
@@ -315,3 +324,31 @@ def get_edge_analysis(img, method="Canny"):
         return lap
     else:
         return gray
+
+
+def calculate_frequency_L1(img_gt, img_sr):
+    """
+    计算 GT 和 SR 图像在频域上的 L1 距离 (Log-PSD MAE)。
+
+    Args:
+        img_gt (np.ndarray): Ground Truth 图片 (H, W, 3) 或 (H, W), 范围 0-255.
+        img_sr (np.ndarray): 生成的图片 (H, W, 3) 或 (H, W), 范围 0-255.
+
+    Returns:
+        float: 频域距离分数 (越低越好).
+        (np.array, np.array): 返回 GT 和 SR 的 1D 曲线数据，方便画图分析.
+    """
+    psd_gt = get_1d_power_spectrum(img_gt)
+    psd_sr = get_1d_power_spectrum(img_sr)
+
+    min_len = min(len(psd_gt), len(psd_sr))
+    curve_gt = psd_gt[1:min_len]
+    curve_sr = psd_sr[1:min_len]
+    curve_gt = 10 * np.log10(psd_gt + 1e-10)
+    curve_sr = 10 * np.log10(psd_sr + 1e-10)
+
+    # 计算平均绝对误差
+    score = np.mean(np.abs(curve_gt - curve_sr))
+
+    return score
+

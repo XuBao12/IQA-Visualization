@@ -50,6 +50,7 @@ with st.sidebar:
         "CNNIQA",
         "MUSIQ",
         "DISTS",
+        "Frequency L1",
     ]
     selected_metrics = st.multiselect(
         "选择指标 (Select Metrics)",
@@ -669,10 +670,14 @@ if img_gt_raw is not None and img_sr_raw is not None:
             st.write("#### 1D 功率谱对比")
             # Plot 1D Power Spectrum
             fig_1d, ax_1d = plt.subplots(figsize=(10, 4))
-            ax_1d.plot(np.log10(psd_gt + 1e-8), label="GT", alpha=0.8, linewidth=1.5)
-            ax_1d.plot(np.log10(psd_sr + 1e-8), label="SR", alpha=0.8, linewidth=1.5)
+            ax_1d.plot(
+                10 * np.log10(psd_gt + 1e-8), label="GT", alpha=0.8, linewidth=1.5
+            )
+            ax_1d.plot(
+                10 * np.log10(psd_sr + 1e-8), label="SR", alpha=0.8, linewidth=1.5
+            )
             ax_1d.set_xlabel("Frequency (Radius)")
-            ax_1d.set_ylabel("Log Power")
+            ax_1d.set_ylabel("Log Power (dB)")
             ax_1d.set_title("1D Power Spectrum")
             ax_1d.legend()
             ax_1d.grid(True, alpha=0.3)
@@ -683,13 +688,13 @@ if img_gt_raw is not None and img_sr_raw is not None:
             st.write("#### SR 与 GT 差异曲线 (Log Power Difference)")
             st.caption("值 > 0 表示 SR 在该频率分量能量高于 GT，值 < 0 表示低于 GT。")
 
-            diff_curve = np.log10(psd_sr + 1e-8) - np.log10(psd_gt + 1e-8)
+            diff_curve = 10 * np.log10(psd_sr + 1e-8) - 10 * np.log10(psd_gt + 1e-8)
 
             fig_diff, ax_diff = plt.subplots(figsize=(10, 4))
             ax_diff.plot(diff_curve, label="SR - GT", color="red", linewidth=1.5)
             ax_diff.axhline(0, color="black", linestyle="--", alpha=0.5)
             ax_diff.set_xlabel("Frequency (Radius)")
-            ax_diff.set_ylabel("Difference (Log Power)")
+            ax_diff.set_ylabel("Difference (Log Power) (dB)")
             ax_diff.set_title("Spectrum Difference")
             ax_diff.legend()
             ax_diff.grid(True, alpha=0.3)
