@@ -56,8 +56,8 @@ def preprocess_images(img_gt, img_sr, crop_border=0):
 
     if (h_gt != h_sr) or (w_gt != w_sr):
         # Resize SR to match GT
-        # img_sr = cv2.resize(img_sr, (w_gt, h_gt), interpolation=cv2.INTER_CUBIC)
-        img_gt = cv2.resize(img_gt, (w_sr, h_sr), interpolation=cv2.INTER_CUBIC)
+        img_sr = cv2.resize(img_sr, (w_gt, h_gt), interpolation=cv2.INTER_CUBIC)
+        # img_gt = cv2.resize(img_gt, (w_sr, h_sr), interpolation=cv2.INTER_CUBIC)
 
     if crop_border > 0:
         img_gt = img_gt[crop_border:-crop_border, crop_border:-crop_border, :]
