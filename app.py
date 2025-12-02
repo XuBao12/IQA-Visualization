@@ -50,7 +50,8 @@ with st.sidebar:
         "CNNIQA",
         "MUSIQ",
         "DISTS",
-        "Frequency L1",
+        "SRE",
+        "GSD",
     ]
     selected_metrics = st.multiselect(
         "选择指标 (Select Metrics)",
@@ -390,6 +391,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
             # Separate FID from per-image metrics
             per_image_metrics_selection = [m for m in selected_metrics if m != "FID"]
             calc_fid = "FID" in selected_metrics
+            calc_gsd = "GSD" in selected_metrics
 
             total_files = len(valid_files)
             for i, filename in enumerate(valid_files):
@@ -442,6 +444,18 @@ if img_gt_raw is not None and img_sr_raw is not None:
                     st.warning(
                         "注意：本地上传模式暂不支持计算文件夹级 FID (需要物理路径)。"
                     )
+            if calc_gsd:
+                if input_mode == "服务器路径 文件夹输入":
+                    f_gt = [os.path.join(gt_folder, filename) for filename in valid_files]
+                    f_sr = [os.path.join(sr_folder, filename) for filename in valid_files]
+                    status_text.text("正在计算 GSD... (这可能需要一些时间)")
+                    with st.spinner("正在计算 GSD..."):
+                        fid_score = utils.calculate_gsd(f_gt, f_sr)
+                else:
+                    st.warning(
+                        "注意：本地上传模式暂不支持计算文件夹级 GSD (需要物理路径)。"
+                    )
+
 
             status_text.empty()
 

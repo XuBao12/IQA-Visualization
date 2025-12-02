@@ -110,14 +110,13 @@ def calculate_metrics(
         }
 
         for name in selected_metrics:
-            if name == "Frequency L1":
+            if name == "SRE":
                 try:
-                    score = calculate_frequency_L1(img_gt, img_sr)
+                    score = calculate_SRE(img_gt, img_sr)
                     metrics[name] = score
                 except Exception as e:
-                    print(f"Error calculating Frequency L1: {e}")
+                    print(f"Error calculating SRE: {e}")
                     metrics[name] = float("nan")
-                continue
 
             if name not in metric_configs:
                 continue
@@ -326,7 +325,7 @@ def get_edge_analysis(img, method="Canny"):
         return gray
 
 
-def calculate_frequency_L1(img_gt, img_sr):
+def calculate_SRE(img_gt, img_sr):
     """
     计算 GT 和 SR 图像在频域上的 L1 距离 (Log-PSD MAE)。
 
@@ -352,3 +351,111 @@ def calculate_frequency_L1(img_gt, img_sr):
 
     return score
 
+def calculate_gsd(gt_paths, sr_paths, target_size=(512, 512)):
+    """
+    计算 GSD (Global Spectral Distance) - 数据集层面的全局频域距离。
+
+    逻辑：
+    1. 统一 Resize 所有图片到 target_size (对齐频域刻度)。
+    2. 计算每张图的 原始功率 (Raw Power, |F|^2)。
+    3. 累加所有图的 1D 功率曲线。
+    4. 求平均，得到 "数据集平均功率谱"。
+    5. 转 dB。
+    6. 计算 L1 距离。
+
+    Args:
+        gt_paths (list): GT 图片的路径列表。
+        gen_paths (list): 生成图片的路径列表。
+        target_size (tuple): 统一的计算尺寸，默认 (512, 512)。
+                             建议设为数据集中大部分图片的最小尺寸或标准尺寸。
+
+    Returns:
+        float: GSD 分数 (dB)。
+        tuple: (gt_curve_db, gen_curve_db) 用于画图。
+    """
+
+    # --- 内部辅助函数 1: 预处理 ---
+    def preprocess_image(path):
+        # 读取图片
+        img = cv2.imread(path)
+        if img is None:
+            return None
+
+        # 1. 转灰度 (只分析亮度信息的纹理)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # 2. 归一化 (0~1)
+        img = img.astype(np.float32) / 255.0
+
+        # 3. 统一 Resize (关键步骤！)
+        # 使用 INTER_AREA，因为它在调整大小时对频域信息的破坏最小
+        if img.shape[:2] != target_size:
+            img = cv2.resize(img, target_size, interpolation=cv2.INTER_AREA)
+
+        return img
+    # ================= 核心流程 =================
+
+    # 1. 处理 GT 数据集
+    print(f"Calculating GSD: Processing {len(gt_paths)} GT images...")
+    sum_profile_gt = None
+    count_gt = 0
+
+    for path in gt_paths:
+        img = preprocess_image(path)
+        if img is None: continue
+
+        profile = get_1d_power_spectrum(img)
+
+        if sum_profile_gt is None:
+            sum_profile_gt = np.zeros_like(profile)
+
+        # 累加长度可能不一致（虽然resize了，但bincount结果取决于对角线长度）
+        # 加上 padding 保护
+        if len(profile) > len(sum_profile_gt):
+            profile = profile[:len(sum_profile_gt)]
+        elif len(profile) < len(sum_profile_gt):
+            sum_profile_gt = sum_profile_gt[:len(profile)]
+
+        sum_profile_gt += profile
+        count_gt += 1
+
+    avg_profile_gt = sum_profile_gt / count_gt
+
+    # 2. 处理 Gen 数据集
+    print(f"Calculating GSD: Processing {len(sr_paths)} Generated images...")
+    sum_profile_sr = None
+    count_sr = 0
+
+    for path in sr_paths:
+        img = preprocess_image(path)
+        if img is None: continue
+
+        profile = get_1d_power_spectrum(img)
+
+        if sum_profile_sr is None:
+            sum_profile_sr = np.zeros_like(profile)
+
+        # 长度对齐保护
+        length = min(len(profile), len(sum_profile_sr))
+        sum_profile_sr = sum_profile_sr[:length] + profile[:length]
+        count_sr += 1
+
+    avg_profile_sr = sum_profile_sr / count_sr
+
+    # ================= 计算指标 =================
+
+    # 3. 截断无效区域
+    # 因为 Resize 到了 target_size，对角线长度是固定的
+    # 通常取半径的前 85% 比较稳妥，去掉边角的高频伪影
+    min_len = min(len(avg_profile_gt), len(avg_profile_sr))
+    valid_len = int(min_len * 0.85)
+
+    # 4. 转 dB (先平均，后 Log) - 这是 GSD 的精髓
+    # 跳过 index 0 (DC分量/平均亮度)
+    curve_gt_db = 10 * np.log10(avg_profile_gt[1:valid_len] + 1e-10)
+    curve_sr_db = 10 * np.log10(avg_profile_sr[1:valid_len] + 1e-10)
+
+    # 5. 计算 L1 距离 (MAE)
+    gsd_score = np.mean(np.abs(curve_gt_db - curve_sr_db))
+
+    return gsd_score
