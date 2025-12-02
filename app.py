@@ -435,6 +435,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
 
             # Calculate FID globally
             fid_score = None
+            gsd_score = None
             if calc_fid:
                 if input_mode == "服务器路径 文件夹输入":
                     status_text.text("正在计算 FID... (这可能需要一些时间)")
@@ -450,7 +451,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
                     f_sr = [os.path.join(sr_folder, filename) for filename in valid_files]
                     status_text.text("正在计算 GSD... (这可能需要一些时间)")
                     with st.spinner("正在计算 GSD..."):
-                        fid_score = utils.calculate_gsd(f_gt, f_sr)
+                        gsd_score = utils.calculate_gsd(f_gt, f_sr)
                 else:
                     st.warning(
                         "注意：本地上传模式暂不支持计算文件夹级 GSD (需要物理路径)。"
@@ -474,6 +475,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
 
                 st.session_state["batch_results"] = df_all
                 st.session_state["batch_fid"] = fid_score
+                st.session_state["batch_gsd"] = gsd_score
                 st.success("批量评估完成！")
             else:
                 st.error("未计算任何指标。")
@@ -481,6 +483,7 @@ if img_gt_raw is not None and img_sr_raw is not None:
         if "batch_results" in st.session_state:
             df_all = st.session_state["batch_results"]
             fid_score = st.session_state.get("batch_fid", None)
+            gsd_score = st.session_state.get("batch_gsd", None)
 
             # Average
             numeric_cols = df_all.select_dtypes(include=[np.number]).columns
@@ -488,6 +491,8 @@ if img_gt_raw is not None and img_sr_raw is not None:
 
             if fid_score is not None:
                 avg_metrics["FID"] = fid_score
+            if gsd_score is not None:
+                avg_metrics["GSD"] = gsd_score
 
             st.write("### 平均指标")
             if not avg_metrics.empty:
@@ -522,6 +527,10 @@ if img_gt_raw is not None and img_sr_raw is not None:
             if fid_score is not None:
                 st.caption(
                     "*注意：FID 是针对整个文件夹全局计算的，不会显示在单张图片的表格中。*"
+                )
+            if gsd_score is not None:
+                st.caption(
+                    "*注意：GSD 是针对整个文件夹全局计算的，不会显示在单张图片的表格中。*"
                 )
             st.dataframe(df_all)
 
